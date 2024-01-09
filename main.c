@@ -1,6 +1,7 @@
 #include <stdio.h>
 #include <string.h>
-#include<stdint.h>
+#include <stdint.h>
+#include <stdlib.h>
 
 #include <sys/types.h>
 #include <sys/stat.h>
@@ -9,22 +10,37 @@
 
 int main(const int nargs, char const* const args[])
 {
-  if(nargs!=3) {
-    fprintf(stderr,"Usage: %s concatenateddicevalues file|-\n", args[0]);
+  if(nargs!=2) {
+    fprintf(stderr,"Usage: %s file|-\n", args[0]);
     return 1;
   }
 
-  const int nb6s=strlen(args[1]);
-  uint8_t b6vals[nb6s];
+  char* svals = NULL;
+  size_t nb6s;
+
+  printf("Enter dice roll values: ");
+  if((nb6s=getline(&svals, &nb6s, stdin)-1) < 0) {
+    perror("getline");
+    return 1;
+  }
+  printf("%li dice roll values entered\n",nb6s);
+
+  uint8_t* b6vals=(uint8_t*)malloc(nb6s);
+
+  if(!b6vals) {
+    perror("malloc");
+    return 1;
+  }
+
   int i;
 
   for(i=nb6s-1; i>=0; --i) {
 
-    if(args[1][i] < 0x31 || args[1][i] > 0x36) {
-      fprintf(stderr,"%s: Error: Dice value '%c' is invalid!\n", args[0], args[1][i]);
+    if(svals[i] < 0x31 || svals[i] > 0x36) {
+      fprintf(stderr,"%s: Error: Dice value '%c' is invalid!\n", args[0], svals[i]);
       return 1;
     }
-    b6vals[i] = args[1][i] - 0x31;
+    b6vals[i] = svals[i] - 0x31;
   }
 
   const int nmaxbytes=(int)((2.585*nb6s)*0.125+0.5); //~ ceil(ln6/ln2 * nb6s / 8)
@@ -56,10 +72,12 @@ int main(const int nargs, char const* const args[])
     if(b6vals[firstb6]==0) ++firstb6;
   }
 
+  free(b6vals);
+
   if(bit!=7) ++byte;
 
 
-  int fd = (strlen(args[2])==1 && args[2][0]=='-'? STDOUT_FILENO: open(args[2], O_WRONLY|O_CREAT, S_IRUSR|S_IWUSR));
+  int fd = (strlen(args[1])==1 && args[1][0]=='-'? STDOUT_FILENO: open(args[1], O_WRONLY|O_CREAT, S_IRUSR|S_IWUSR));
 
   if(fd < 0) {
     perror("open");
